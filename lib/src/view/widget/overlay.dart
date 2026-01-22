@@ -38,9 +38,21 @@ class _OverlayWidgetState extends State<OverlayWidget> with SingleTickerProvider
 
   @override
   void dispose() {
-    _removeOverlaySafe();
+    _disposeAnimations();
+    _removeOverlayEntry();
     _animeCtrl?.dispose();
     super.dispose();
+  }
+
+  void _disposeAnimations() {
+    _blurAnime = null;
+    _fadeAnime = null;
+  }
+
+  void _removeOverlayEntry() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    _isShowingOverlay.value = false;
   }
 
   void _showOverlay(BuildContext context) async {
@@ -67,20 +79,16 @@ class _OverlayWidgetState extends State<OverlayWidget> with SingleTickerProvider
   }
 
   void _removeOverlaySafe() async {
-    // No overlay or controller created yet
-    if (_overlayEntry == null || _animeCtrl == null) {
-      _overlayEntry = null;
-      _isShowingOverlay.value = false;
+    if (_overlayEntry == null) {
       return;
     }
+
     try {
-      if (mounted) {
+      if (_animeCtrl != null && _animeCtrl!.status != AnimationStatus.dismissed) {
         await _animeCtrl!.reverse();
       }
-      _overlayEntry?.remove();
     } finally {
-      _overlayEntry = null;
-      _isShowingOverlay.value = false;
+      _removeOverlayEntry();
     }
   }
 
