@@ -155,14 +155,6 @@ abstract final class Cryptor {
     }
 
     int result = 0;
-
-    for (int i = 0; i < count; i++) {
-      final aByte = i < a.length ? a[i] : 0;
-      final bByte = i < b.length ? b[i] : 0;
-      result |= aByte ^ bByte;
-    }
-
-    int result = 0;
     for (int i = 0; i < a.length; i++) {
       result |= a[i] ^ b[i];
     }
