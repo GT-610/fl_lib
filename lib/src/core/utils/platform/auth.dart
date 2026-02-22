@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:fl_lib/src/res/l10n.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:local_auth/error_codes.dart' as errs;
 
 abstract final class LocalAuth {
   static final _auth = LocalAuthentication();
@@ -12,28 +9,39 @@ abstract final class LocalAuth {
 
   static Future<bool> get isAvail async {
     try {
-      return await _auth.isDeviceSupported();
+      return await _auth.canCheckBiometrics || await _auth.isDeviceSupported();
     } catch (e) {
-      // If an error occurs, assume biometrics are not available
       return false;
     }
   }
 
-  static Future<void> go({VoidCallback? onUnavailable}) async {
-    if (!_isAuthing) {
-      _isAuthing = true;
-      final val = await goWithResult();
-      switch (val) {
-        case AuthResult.success:
-          break;
-        case AuthResult.fail:
-        case AuthResult.cancel:
-          go(onUnavailable: onUnavailable);
-          break;
-        case AuthResult.notAvail:
-          onUnavailable?.call();
-          break;
+  static Future<void> go({
+    VoidCallback? onUnavailable,
+    int maxRetries = 3,
+  }) async {
+    if (_isAuthing) return;
+    _isAuthing = true;
+
+    try {
+      var retries = 0;
+      while (retries < maxRetries) {
+        final val = await goWithResult();
+        switch (val) {
+          case AuthResult.success:
+            return;
+          case AuthResult.notAvail:
+            onUnavailable?.call();
+            return;
+          case AuthResult.lockedOut:
+            return;
+          case AuthResult.fail:
+          case AuthResult.cancel:
+            retries++;
+            if (retries >= maxRetries) return;
+            break;
+        }
       }
+    } finally {
       _isAuthing = false;
     }
   }
@@ -41,26 +49,27 @@ abstract final class LocalAuth {
   static Future<AuthResult> goWithResult({bool onlyBio = false}) async {
     if (!await isAvail) return AuthResult.notAvail;
     try {
-      await _auth.stopAuthentication();
-      final reuslt = await _auth.authenticate(
+      final result = await _auth.authenticate(
         localizedReason: '🔐 ${l10n.authRequired}',
-        options: AuthenticationOptions(
-          biometricOnly: onlyBio,
-          stickyAuth: true,
-        ),
+        biometricOnly: onlyBio,
+        sensitiveTransaction: false,
+        persistAcrossBackgrounding: true,
       );
-      if (reuslt) {
+      if (result) {
         return AuthResult.success;
       }
       return AuthResult.fail;
-    } on PlatformException catch (e) {
+    } on LocalAuthException catch (e) {
       switch (e.code) {
-        case errs.notEnrolled:
+        case LocalAuthExceptionCode.noBiometricsEnrolled:
           return AuthResult.notAvail;
-        case errs.lockedOut:
-        case errs.permanentlyLockedOut:
-          exit(0);
+        case LocalAuthExceptionCode.temporaryLockout:
+        case LocalAuthExceptionCode.biometricLockout:
+          return AuthResult.lockedOut;
+        default:
+          return AuthResult.cancel;
       }
+    } on PlatformException {
       return AuthResult.cancel;
     }
   }
@@ -68,10 +77,8 @@ abstract final class LocalAuth {
 
 enum AuthResult {
   success,
-  // Not match
   fail,
-  // User cancel
   cancel,
-  // Device doesn't support biometrics
   notAvail,
+  lockedOut,
 }
