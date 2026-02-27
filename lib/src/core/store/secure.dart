@@ -19,7 +19,10 @@ class _SlidingWindowRateLimiter {
   final Duration windowSize;
   final List<int> _timestamps = [];
 
-  _SlidingWindowRateLimiter({required this.maxRequests, required this.windowSize});
+  _SlidingWindowRateLimiter({
+    required this.maxRequests,
+    required this.windowSize,
+  });
 
   bool allowRequest() {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -60,8 +63,16 @@ abstract final class SecureStoreProps {
   /// Password for the backup.
   static const bakPwd = SecureProp('bakPwd');
 
-  /// Password of [HiveStore].
-  static const hivePwd = SecureProp('hivePwd'); 
+  /// Legacy password of [HiveStore].
+  ///
+  /// Kept for migration compatibility only. Prefer [sqlitePwd].
+  @Deprecated(
+    'Use sqlitePwd instead; Hive store is deprecated and will be removed in a future release.',
+  )
+  static const hivePwd = SecureProp('hivePwd');
+
+  /// Password of [SqliteStore].
+  static const sqlitePwd = SecureProp('sqlitePwd');
 }
 
 /// The secure store.
