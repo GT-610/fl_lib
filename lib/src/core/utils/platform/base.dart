@@ -124,6 +124,14 @@ enum Pfs {
     return picked?.path;
   }
 
+  /// Pick a directory and return its path.
+  ///
+  /// Desktop and Android only — iOS has no directory a user can hand over, and
+  /// the picker answers null there rather than failing.
+  static Future<String?> pickDirectory({String? title}) {
+    return FilePicker.getDirectoryPath(dialogTitle: title);
+  }
+
   /// Pick a file and return the file String.
   static Future<String?> pickFileString() async {
     final picked = await pickFile();
