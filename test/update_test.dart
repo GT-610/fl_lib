@@ -448,6 +448,36 @@ void main() {
     expect(AppUpdate.url, isNull);
   });
 
+  /// A repository may publish a release that is not an app build at all: a
+  /// `nightly` tag, an artifact for something else that lives alongside. It has
+  /// to be ignored rather than reported — it is not malformed, and warning
+  /// about it would put a line in every log on every update check.
+  test('a release that names no version is ignored, not an update', () {
+    AppUpdate.fromGitHubReleasesStr(
+      raw: _githubRaw([
+        _release(
+          tag: 'nightly',
+          name: 'Nightly build',
+          assets: [_asset('something-else.zip')],
+        ),
+        _release(
+          tag: 'v1.0.3',
+          assets: [_asset('ServerBox_v1.0.3_windows_amd64.zip')],
+        ),
+      ]),
+      build: 1,
+      platform: Pfs.windows,
+      arch: CpuArch.amd64,
+    );
+
+    // The real release still wins, and what is offered is its asset — not
+    // something from a release that only looked like one because it sits in the
+    // same repository.
+    expect(AppUpdate.version, (3, AppUpdateLevel.normal));
+    expect(AppUpdate.versionName, 'v1.0.3');
+    expect(AppUpdate.url, 'https://download/ServerBox_v1.0.3_windows_amd64.zip');
+  });
+
   test('github missing platform asset still names the newest version', () {
     // No release has a Windows asset, so there is nothing to install — but the
     // version is known and the settings page should say so rather than

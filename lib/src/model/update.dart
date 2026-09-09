@@ -663,7 +663,16 @@ final class _GitHubRelease {
     required this.assets,
   });
 
-  factory _GitHubRelease._fromJson(Map<String, dynamic> data) {
+  /// Reads one release, or null when it is not an app build at all.
+  ///
+  /// **A release with no version anywhere in it is not malformed.** A
+  /// repository may publish one for something else — a `nightly` tag, packages
+  /// for something that is not the app — and that is a release this parser has
+  /// nothing to say about. Warning would put a line in every log on every
+  /// update check, and it is the sort of line that sends whoever reads it after
+  /// the wrong thing. Anything else that goes wrong here still throws, and
+  /// [fromJson] still says so.
+  static _GitHubRelease? _fromJson(Map<String, dynamic> data) {
     // The tag names the version everywhere the user sees it, so the build has
     // to come from the same string that ends up on screen.
     var tag = _nonEmptyStr(data['tag_name']);
@@ -672,9 +681,7 @@ final class _GitHubRelease {
       tag = _nonEmptyStr(data['name']);
       build = _parseBuild(tag);
     }
-    if (build == null || tag == null) {
-      throw FormatException('GitHub release build not found: $data');
-    }
+    if (build == null || tag == null) return null;
 
     final assets = (data['assets'] as List? ?? [])
         .whereType<Map<String, dynamic>>()
