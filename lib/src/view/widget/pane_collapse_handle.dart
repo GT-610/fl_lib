@@ -13,14 +13,28 @@ import 'package:flutter/material.dart';
 /// reached by touch as well, where there is no hover to reveal anything, and a
 /// control that only exists under a mouse leaves a tablet with no way back.
 ///
-/// This is a button rather than part of the divider's drag target. Keeping the
-/// two hit regions separate makes the pointer tell the truth: the chevron
-/// clicks, while the visible line above and below it resizes.
+/// It resizes as well as folds, because of where it sits. Forty-four points
+/// tall and centred on the seam, it covers exactly the stretch of the line a
+/// pointer aims for — so while the two hit regions were kept separate, a drag
+/// started in the middle of the divider did nothing at all. The answer is not
+/// to move the grip, since the middle is where it belongs, but to let it hand
+/// the drag on to the same callbacks the line uses.
+///
+/// Both gestures on one detector, and the arena decides between them: a
+/// pointer that travels past the touch slop is a resize, one that does not is
+/// a tap. Dragging it away from the edge while folded unfolds the column, for
+/// the same reason and by the same path as dragging the line does.
+///
+/// The cursor stays [SystemMouseCursors.click]. What this control is *for* is
+/// the fold; resizing from it is a rescue for an aim that landed here, and the
+/// line above and below already offers the resize cursor.
 class PaneCollapseHandle extends StatefulWidget {
   const PaneCollapseHandle({
     super.key,
     required this.collapsed,
     required this.onTap,
+    this.onDrag,
+    this.onDragEnd,
     this.tooltip,
   });
 
@@ -28,6 +42,17 @@ class PaneCollapseHandle extends StatefulWidget {
   final bool collapsed;
 
   final VoidCallback onTap;
+
+  /// Pointer movement since the last call, in logical pixels — the same
+  /// contract as [PaneDivider.onDrag], and meant to be given the same handler.
+  ///
+  /// Null leaves this a plain button, which is what it is anywhere the seam it
+  /// sits on cannot be moved.
+  final ValueChanged<double>? onDrag;
+
+  /// The drag is over. See [PaneDivider.onDragEnd] — a width is persisted
+  /// here, not on every frame of the drag.
+  final VoidCallback? onDragEnd;
 
   final String? tooltip;
 
@@ -129,6 +154,12 @@ class _PaneCollapseHandleState extends State<PaneCollapseHandle> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onTap,
+            onHorizontalDragUpdate: widget.onDrag == null
+                ? null
+                : (details) => widget.onDrag!(details.delta.dx),
+            onHorizontalDragEnd: widget.onDrag == null
+                ? null
+                : (_) => widget.onDragEnd?.call(),
             child: handle,
           ),
         ),

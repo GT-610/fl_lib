@@ -449,6 +449,11 @@ class _AdaptivePanesState extends State<AdaptivePanes>
                           ? widget.expandTooltip
                           : widget.collapseTooltip,
                       onTap: () => onCollapsed(!widget.collapsed),
+                      // The same handlers the line itself is given. The grip
+                      // sits on top of it, so without these a drag aimed at
+                      // the middle of the seam hit a button and stopped.
+                      onDrag: _onSeamDrag,
+                      onDragEnd: _onSeamDragEnd,
                     ),
                   ),
                 ),

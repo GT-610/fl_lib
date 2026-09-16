@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('the collapse handle clicks while only the divider resizes', (
+  testWidgets('the collapse handle both folds and resizes', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 700));
@@ -51,9 +51,18 @@ void main() {
       matchesSemantics(label: 'Hide list', isButton: true, hasTapAction: true),
     );
 
+    // It covers the middle of the seam, which is where a pointer aims for the
+    // line — so a drag landing on it has to resize rather than be swallowed.
     await tester.drag(handle, const Offset(80, 0));
     await tester.pumpAndSettle();
-    expect(savedWidth, isNull);
+    expect(savedWidth, isNotNull);
+    expect(
+      savedWidth,
+      greaterThan(0),
+      reason: 'the drag reached onListWidthChanged',
+    );
+    // A resize is not a fold: the arena gave the pointer to the drag, so the
+    // tap callback must not also have fired.
     expect(collapsed, isNull);
 
     await tester.tap(handle);
@@ -77,5 +86,45 @@ void main() {
       tester.getSemantics(find.bySemanticsLabel('Expand')),
       matchesSemantics(label: 'Expand', isButton: true, hasTapAction: true),
     );
+  });
+
+  /// `_kPullToUnfold` is documented as "how far *the grip* has to be dragged
+  /// away from the edge to unfold" — which it could not be, while the grip
+  /// swallowed every drag that landed on it and only the line could do this.
+  testWidgets('dragging the folded grip away from the edge unfolds it', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    bool? collapsed;
+    var paneCollapsed = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => AdaptivePanes.surface(
+              listBuilder: (_, _) => const ColoredBox(color: Colors.grey),
+              surfaceBuilder: (_, _) => const ColoredBox(color: Colors.white),
+              collapsed: paneCollapsed,
+              onCollapsedChanged: (value) {
+                collapsed = value;
+                setState(() => paneCollapsed = value);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Only that the drag reaches `_onSeamDrag` at all, which is what the grip
+    // used to swallow. Well past `_kPullToUnfold` on purpose: `drag` spends
+    // the touch slop before any of the offset is delivered, and a short one
+    // is a tap rather than a drag — which would unfold it down the other
+    // path and prove nothing.
+    await tester.drag(find.byType(PaneCollapseHandle), const Offset(80, 0));
+    await tester.pumpAndSettle();
+    expect(collapsed, isFalse);
   });
 }
