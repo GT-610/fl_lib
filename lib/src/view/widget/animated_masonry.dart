@@ -5,6 +5,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 
+/// How tall each card of an [AnimatedMasonry] was the last time it was laid
+/// out in its column, kept by whoever owns the grid.
+///
+/// An expanded card takes no column space, so its column is told it still
+/// costs what it did before — and "before" was the first layout the card was
+/// expanded in. That is right for a grid that was on screen when the card
+/// started growing. A grid mounted with a card already expanded has no such
+/// layout: what it measured was the card at its expanded height, so every card
+/// after it in that column was placed that much too low for the whole way
+/// back, and travelled home only once the card had landed. A list in one
+/// column is that case every time.
+///
+/// Held outside the grid because the grid is what goes away. Without one the
+/// first expanded layout is used, as before.
+final class MasonryMemory {
+  final _heights = <Key, double>{};
+
+  /// For a caller whose cards have changed shape entirely, so that what was
+  /// learned about the old one is not used for the new.
+  void clear() => _heights.clear();
+}
+
 /// The masonry [MasonryList] draws, with cards that move instead of jumping.
 ///
 /// Three things happen to a grid of cards and all three used to happen between
@@ -42,8 +64,15 @@ final class AnimatedMasonry extends StatefulWidget {
     this.footer,
     this.expandedKey,
     this.expansion = 0,
+    this.memory,
     this.scrollable = true,
   });
+
+  /// What this grid learned about its cards that has to outlive it.
+  ///
+  /// Needed by a caller that takes the grid off screen while a card is
+  /// expanded and mounts it again for the way back — see [MasonryMemory].
+  final MasonryMemory? memory;
 
   /// One per card. Each must carry a [Key] — see the class doc.
   final List<Widget> children;
@@ -155,6 +184,8 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
           ? -1
           : entries.indexWhere((e) => e.key == widget.expandedKey),
       expansion: widget.expansion,
+      memory: widget.memory,
+      keys: [for (final entry in entries) entry.key],
       children: [
         for (final entry in entries)
           _MasonryEntry(
@@ -242,6 +273,8 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
     required this.vsync,
     required this.expandedAt,
     required this.expansion,
+    required this.memory,
+    required this.keys,
   });
 
   final double columnWidth;
@@ -251,6 +284,10 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
   final TickerProvider vsync;
   final int expandedAt;
   final double expansion;
+  final MasonryMemory? memory;
+
+  /// Each child's own key, in order: what [memory] knows a card by.
+  final List<Key> keys;
 
   @override
   _RenderMasonryFlow createRenderObject(BuildContext context) {
@@ -262,6 +299,8 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
       vsync: vsync,
       expandedAt: expandedAt,
       expansion: expansion,
+      memory: memory,
+      keys: keys,
     );
   }
 
@@ -274,7 +313,9 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
       ..moveDuration = moveDuration
       ..vsync = vsync
       ..expandedAt = expandedAt
-      ..expansion = expansion;
+      ..expansion = expansion
+      ..memory = memory
+      ..keys = keys;
   }
 }
 
@@ -318,6 +359,8 @@ final class _RenderMasonryFlow extends RenderBox
     required TickerProvider vsync,
     required int expandedAt,
     required double expansion,
+    required this.memory,
+    required this.keys,
   }) : _columnWidth = columnWidth,
        _maxColumns = maxColumns,
        _spacing = spacing,
@@ -325,6 +368,11 @@ final class _RenderMasonryFlow extends RenderBox
        _vsync = vsync,
        _expandedAt = expandedAt,
        _expansion = expansion;
+
+  /// Read and written during layout, so neither needs a layout of its own: a
+  /// change of cards is a change of children, which is one already.
+  MasonryMemory? memory;
+  List<Key> keys;
 
   /// Within half a pixel of home is home. Without a floor the ease never
   /// arrives, and a ticker that never stops is a grid that repaints forever.
@@ -374,6 +422,14 @@ final class _RenderMasonryFlow extends RenderBox
   /// in an ordinary column, which is what makes the first frame of the growth
   /// continuous with the grid it leaves.
   bool _isExpanded(int at) => at == _expandedAt && _expansion > 0;
+
+  /// What the card at [at] cost its column the last time it was in one.
+  double? _remembered(int at) =>
+      at < keys.length ? memory?._heights[keys[at]] : null;
+
+  void _remember(int at, double height) {
+    if (at < keys.length) memory?._heights[keys[at]] = height;
+  }
 
   /// How wide the card at [at] is laid out, which is a column's width for
   /// every card but the one growing out of the grid.
@@ -531,7 +587,10 @@ final class _RenderMasonryFlow extends RenderBox
         //
         // It takes no column space either: it is as wide as all of them.
         pd.expandFrom ??= pd.current ?? slot;
-        pd.expandHeight ??= child.size.height;
+        // What it cost its column the last time it was in one, where that is
+        // known — see [MasonryMemory]. This layout's own height is the card
+        // already expanded whenever the grid was mounted that way.
+        pd.expandHeight ??= _remembered(at) ?? child.size.height;
         pd.target = Offset.lerp(pd.expandFrom!, Offset.zero, _expansion)!;
         pd.current = pd.target;
         // Its column is told it is still the size it was, so the cards after
@@ -540,6 +599,7 @@ final class _RenderMasonryFlow extends RenderBox
       } else {
         pd.target = slot;
         heights[col] += _slotHeight(child.size.height);
+        _remember(at, child.size.height);
       }
       // Never travelled, so it has nowhere to travel from: a card that has
       // just been added is drawn where it lands and grows there.
