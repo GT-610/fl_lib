@@ -20,6 +20,13 @@ class CardX extends StatelessWidget {
   /// Defaults to [Clip.hardEdge] for better performance on low-end devices.
   final Clip clipBehavior;
 
+  /// What the card keeps clear around itself.
+  ///
+  /// Null is `Card`'s own 4pt, which is what most of the app wants: cards are
+  /// laid out in grids whose spacing was chosen knowing about it. A list of
+  /// them packed tight enough to read as one thing passes something smaller.
+  final EdgeInsetsGeometry? margin;
+
   /// Creates a [CardX] widget.
   ///
   /// The [child] parameter is required.
@@ -29,6 +36,7 @@ class CardX extends StatelessWidget {
     this.color,
     this.radius,
     this.clipBehavior = Clip.hardEdge,
+    this.margin,
   });
 
   /// Default border radius with 13px circular corners.
@@ -48,6 +56,7 @@ class CardX extends StatelessWidget {
       key: key,
       clipBehavior: clipBehavior,
       color: color,
+      margin: margin,
       shape: RoundedRectangleBorder(
         borderRadius: radius ?? borderRadius,
       ),
