@@ -271,6 +271,15 @@ final class _MasonryParentData extends ContainerBoxParentData<RenderBox> {
   /// laid out once, which is how a card that has just appeared is told apart
   /// from one that moved — the first is drawn where it lands, no travel.
   Offset? current;
+
+  /// Where the card was when it started growing out of the grid.
+  ///
+  /// Taken once and held, because the slot it would otherwise be measured
+  /// from moves under it: the cards making way shrink to nothing partway
+  /// through, and the column the growing one belongs to collapses to the
+  /// first. Measured fresh every layout, the card slid smoothly most of the
+  /// way and then jumped the rest.
+  Offset? expandFrom;
 }
 
 final class _RenderMasonryFlow extends RenderBox
@@ -482,14 +491,23 @@ final class _RenderMasonryFlow extends RenderBox
         parentUsesSize: true,
       );
 
+      final col = _shortest(heights);
+      final slot = Offset(col * (colWidth + _spacing), heights[col]);
+      if (!_isExpanded(at)) pd.expandFrom = null;
       if (_isExpanded(at)) {
-        // The top of the grid, and none of a column: it is as wide as all of
-        // them. The travel there is the ordinary ease, so the card leaves its
-        // slot at the same pace as it takes the width.
-        pd.target = Offset.zero;
+        // Between its column and the top of the grid, on [expansion] itself
+        // rather than on the ease every other card travels by. The two are
+        // different curves, and a card whose width was on one and whose
+        // position was on the other arrived at the top well after it had
+        // taken the width — which reads as two movements, and puts everything
+        // else driven by [expansion] visibly ahead of the card.
+        //
+        // It takes no column space either: it is as wide as all of them.
+        pd.expandFrom ??= pd.current ?? slot;
+        pd.target = Offset.lerp(pd.expandFrom!, Offset.zero, _expansion)!;
+        pd.current = pd.target;
       } else {
-        final col = _shortest(heights);
-        pd.target = Offset(col * (colWidth + _spacing), heights[col]);
+        pd.target = slot;
         heights[col] += _slotHeight(child.size.height);
       }
       // Never travelled, so it has nowhere to travel from: a card that has
