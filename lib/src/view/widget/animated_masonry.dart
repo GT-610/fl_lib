@@ -38,6 +38,10 @@ final class AnimatedMasonry extends StatefulWidget {
     this.controller,
     this.moveDuration = Durations.medium2,
     this.changeDuration = Durations.medium2,
+    this.header,
+    this.footer,
+    this.expandedKey,
+    this.expansion = 0,
   });
 
   /// One per card. Each must carry a [Key] — see the class doc.
@@ -67,6 +71,29 @@ final class AnimatedMasonry extends StatefulWidget {
 
   /// How long a card takes to grow in or shrink out.
   final Duration changeDuration;
+
+  /// Above the grid, inside the same scrollable.
+  ///
+  /// A row of controls over a grid is usually a bar, which is pinned; this is
+  /// for the ones that belong *to* the grid and should leave with it.
+  final Widget? header;
+
+  /// Under the grid, inside the same scrollable.
+  final Widget? footer;
+
+  /// {@template masonry_expansion}
+  /// The card that is growing out of the grid into the page, and how far along
+  /// it is: 0 leaves it in its column, 1 gives it the full width.
+  ///
+  /// Only the width is this; where the card goes is the ordinary layout, since
+  /// a caller that expands one card takes the others out of [children] and the
+  /// grid carries what is left to the top by itself. That is also what fades
+  /// the others out — they are leaving, which is a thing this already draws.
+  /// {@endtemplate}
+  final Key? expandedKey;
+
+  /// {@macro masonry_expansion}
+  final double expansion;
 
   @override
   State<AnimatedMasonry> createState() => _AnimatedMasonryState();
@@ -108,6 +135,32 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
 
   @override
   Widget build(BuildContext context) {
+    final entries = _children.entries;
+    final grid = _MasonryFlow(
+      columnWidth: widget.columnWidth,
+      maxColumns: widget.maxColumns,
+      spacing: widget.spacing,
+      moveDuration: widget.moveDuration,
+      vsync: this,
+      expandedAt: widget.expandedKey == null
+          ? -1
+          : entries.indexWhere((e) => e.key == widget.expandedKey),
+      expansion: widget.expansion,
+      children: [
+        for (final entry in entries)
+          _MasonryEntry(
+            // Derived from the card's key rather than being it. The wrapper
+            // needs one — it is what keeps a card's element, and so its
+            // slide and its scroll position, with the card when the order
+            // changes — but two widgets in one branch under the same key
+            // make `find.byKey` ambiguous and read as a mistake.
+            key: ValueKey(entry.key),
+            anim: entry.curve,
+            child: entry.child,
+          ),
+      ],
+    );
+
     return SingleChildScrollView(
       controller: widget.controller,
       padding: widget.padding,
@@ -116,26 +169,12 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
       // under, and pull-to-refresh needs somewhere to pull from; a page of one
       // card had neither, and read as frozen rather than as short.
       physics: const AlwaysScrollableScrollPhysics(),
-      child: _MasonryFlow(
-        columnWidth: widget.columnWidth,
-        maxColumns: widget.maxColumns,
-        spacing: widget.spacing,
-        moveDuration: widget.moveDuration,
-        vsync: this,
-        children: [
-          for (final entry in _children.entries)
-            _MasonryEntry(
-              // Derived from the card's key rather than being it. The wrapper
-              // needs one — it is what keeps a card's element, and so its
-              // slide and its scroll position, with the card when the order
-              // changes — but two widgets in one branch under the same key
-              // make `find.byKey` ambiguous and read as a mistake.
-              key: ValueKey(entry.key),
-              anim: entry.curve,
-              child: entry.child,
+      child: widget.header == null && widget.footer == null
+          ? grid
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [?widget.header, grid, ?widget.footer],
             ),
-        ],
-      ),
     );
   }
 }
@@ -182,6 +221,8 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
     required this.spacing,
     required this.moveDuration,
     required this.vsync,
+    required this.expandedAt,
+    required this.expansion,
   });
 
   final double columnWidth;
@@ -189,6 +230,8 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
   final double spacing;
   final Duration moveDuration;
   final TickerProvider vsync;
+  final int expandedAt;
+  final double expansion;
 
   @override
   _RenderMasonryFlow createRenderObject(BuildContext context) {
@@ -198,6 +241,8 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
       spacing: spacing,
       moveDuration: moveDuration,
       vsync: vsync,
+      expandedAt: expandedAt,
+      expansion: expansion,
     );
   }
 
@@ -208,7 +253,9 @@ final class _MasonryFlow extends MultiChildRenderObjectWidget {
       ..maxColumns = maxColumns
       ..spacing = spacing
       ..moveDuration = moveDuration
-      ..vsync = vsync;
+      ..vsync = vsync
+      ..expandedAt = expandedAt
+      ..expansion = expansion;
   }
 }
 
@@ -232,11 +279,15 @@ final class _RenderMasonryFlow extends RenderBox
     required double spacing,
     required Duration moveDuration,
     required TickerProvider vsync,
+    required int expandedAt,
+    required double expansion,
   }) : _columnWidth = columnWidth,
        _maxColumns = maxColumns,
        _spacing = spacing,
        _moveDuration = moveDuration,
-       _vsync = vsync;
+       _vsync = vsync,
+       _expandedAt = expandedAt,
+       _expansion = expansion;
 
   /// Within half a pixel of home is home. Without a floor the ease never
   /// arrives, and a ticker that never stops is a grid that repaints forever.
@@ -265,6 +316,34 @@ final class _RenderMasonryFlow extends RenderBox
 
   Duration _moveDuration;
   set moveDuration(Duration v) => _moveDuration = v;
+
+  int _expandedAt;
+  set expandedAt(int v) {
+    if (_expandedAt == v) return;
+    _expandedAt = v;
+    markNeedsLayout();
+  }
+
+  double _expansion;
+  set expansion(double v) {
+    if (_expansion == v) return;
+    _expansion = v;
+    markNeedsLayout();
+  }
+
+  /// Whether the card at [at] is the one growing out of the grid.
+  ///
+  /// Only once it has started: at rest the expanded card is an ordinary card
+  /// in an ordinary column, which is what makes the first frame of the growth
+  /// continuous with the grid it leaves.
+  bool _isExpanded(int at) => at == _expandedAt && _expansion > 0;
+
+  /// How wide the card at [at] is laid out, which is a column's width for
+  /// every card but the one growing out of the grid.
+  double _widthOf(int at, double colWidth, double full) {
+    if (at != _expandedAt || _expansion <= 0) return colWidth;
+    return colWidth + (full - colWidth) * _expansion;
+  }
 
   TickerProvider _vsync;
   set vsync(TickerProvider v) {
@@ -337,16 +416,23 @@ final class _RenderMasonryFlow extends RenderBox
     final heights = List.filled(columns, 0.0);
 
     var child = firstChild;
+    var at = 0;
+    var expandedHeight = 0.0;
     while (child != null) {
       final size = child.getDryLayout(
-        BoxConstraints.tightFor(width: colWidth),
+        BoxConstraints.tightFor(width: _widthOf(at, colWidth, width)),
       );
-      final col = _shortest(heights);
-      heights[col] += _slotHeight(size.height);
+      if (_isExpanded(at)) {
+        expandedHeight = size.height;
+      } else {
+        final col = _shortest(heights);
+        heights[col] += _slotHeight(size.height);
+      }
       child = (child.parentData! as _MasonryParentData).nextSibling;
+      at++;
     }
 
-    return Size(width, _contentHeight(heights));
+    return Size(width, math.max(_contentHeight(heights), expandedHeight));
   }
 
   /// What a card of [height] costs its column, gap included.
@@ -384,15 +470,24 @@ final class _RenderMasonryFlow extends RenderBox
     var drawnBottom = 0.0;
 
     var child = firstChild;
+    var at = 0;
     while (child != null) {
       final pd = child.parentData! as _MasonryParentData;
       child.layout(
-        BoxConstraints.tightFor(width: colWidth),
+        BoxConstraints.tightFor(width: _widthOf(at, colWidth, width)),
         parentUsesSize: true,
       );
 
-      final col = _shortest(heights);
-      pd.target = Offset(col * (colWidth + _spacing), heights[col]);
+      if (_isExpanded(at)) {
+        // The top of the grid, and none of a column: it is as wide as all of
+        // them. The travel there is the ordinary ease, so the card leaves its
+        // slot at the same pace as it takes the width.
+        pd.target = Offset.zero;
+      } else {
+        final col = _shortest(heights);
+        pd.target = Offset(col * (colWidth + _spacing), heights[col]);
+        heights[col] += _slotHeight(child.size.height);
+      }
       // Never travelled, so it has nowhere to travel from: a card that has
       // just been added is drawn where it lands and grows there.
       pd.current ??= pd.target;
@@ -402,8 +497,8 @@ final class _RenderMasonryFlow extends RenderBox
         drawnBottom = math.max(drawnBottom, pd.offset.dy + child.size.height);
       }
 
-      heights[col] += _slotHeight(child.size.height);
       child = pd.nextSibling;
+      at++;
     }
 
     size = constraints.constrain(
@@ -479,9 +574,37 @@ final class _RenderMasonryFlow extends RenderBox
     markNeedsLayout();
   }
 
+  /// The children in the order they are painted: the one growing out of the
+  /// grid last, so that it is over the ones making way for it rather than
+  /// under whichever of them happens to come after it in the list.
+  List<RenderBox> get _painted {
+    final all = <RenderBox>[];
+    RenderBox? expanded;
+    var child = firstChild;
+    var at = 0;
+    while (child != null) {
+      if (_isExpanded(at)) {
+        expanded = child;
+      } else {
+        all.add(child);
+      }
+      child = (child.parentData! as _MasonryParentData).nextSibling;
+      at++;
+    }
+    if (expanded != null) all.add(expanded);
+    return all;
+  }
+
   @override
   void paint(PaintingContext context, Offset offset) {
-    defaultPaint(context, offset);
+    if (_expandedAt < 0 || _expansion <= 0) {
+      defaultPaint(context, offset);
+      return;
+    }
+    for (final child in _painted) {
+      final pd = child.parentData! as _MasonryParentData;
+      context.paintChild(child, pd.offset + offset);
+    }
   }
 
   @override
@@ -489,6 +612,20 @@ final class _RenderMasonryFlow extends RenderBox
     // [pd.offset] is kept equal to where the card is drawn, so the default —
     // which is what taps go through — follows it without knowing about any of
     // this.
-    return defaultHitTestChildren(result, position: position);
+    if (_expandedAt < 0 || _expansion <= 0) {
+      return defaultHitTestChildren(result, position: position);
+    }
+    // Topmost first, which is the reverse of the paint order.
+    for (final child in _painted.reversed) {
+      final pd = child.parentData! as _MasonryParentData;
+      final hit = result.addWithPaintOffset(
+        offset: pd.offset,
+        position: position,
+        hitTest: (result, transformed) =>
+            child.hitTest(result, position: transformed),
+      );
+      if (hit) return true;
+    }
+    return false;
   }
 }

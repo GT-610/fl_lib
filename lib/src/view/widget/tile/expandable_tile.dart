@@ -187,12 +187,20 @@ class _ExpandableTileState extends State<ExpandableTile>
                 ),
                 const SizedBox(width: 13),
               ],
-              DefaultTextStyle.merge(
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+              // Flexible, because the summary beside it is `Expanded` and so
+              // gives up its own width first: a title longer than the row ran
+              // past the card and struck it with the overflow stripe, which is
+              // what a narrow window did to every one of these.
+              Flexible(
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  child: widget.title,
                 ),
-                child: widget.title,
               ),
               const SizedBox(width: 13),
               // Takes the rest of the line so that the summaries of a stack of
