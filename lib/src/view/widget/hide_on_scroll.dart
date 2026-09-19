@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -22,16 +23,38 @@ import 'package:flutter/rendering.dart';
 class HideOnScroll extends StatefulWidget {
   const HideOnScroll({
     super.key,
-    required this.controller,
+    required ScrollController this.controller,
     required this.child,
     this.duration = Durations.short4,
     this.curve = Curves.easeOutCubic,
     this.enterDuration = Durations.medium2,
     this.enterCurve = Curves.easeOutBack,
     this.enterDelay = Durations.medium1,
-  });
+  }) : visible = null;
 
-  final ScrollController controller;
+  /// The same bar, told whether it is wanted rather than working it out.
+  ///
+  /// For a bar that outlives the scrollable it floats over: one that stays put
+  /// while the page under it is replaced has no single controller to listen
+  /// to, and attaching one [ScrollController] to both halves of such a
+  /// replacement is an assertion. Whatever does own both ends — a
+  /// `NotificationListener` above them — answers the same question here.
+  const HideOnScroll.driven({
+    super.key,
+    required ValueListenable<bool> this.visible,
+    required this.child,
+    this.duration = Durations.short4,
+    this.curve = Curves.easeOutCubic,
+    this.enterDuration = Durations.medium2,
+    this.enterCurve = Curves.easeOutBack,
+    this.enterDelay = Durations.medium1,
+  }) : controller = null;
+
+  final ScrollController? controller;
+
+  /// Whether the bar is wanted, when something other than [controller] says.
+  final ValueListenable<bool>? visible;
+
   final Widget child;
 
   final Duration duration;
@@ -77,7 +100,8 @@ class _HideOnScrollState extends State<HideOnScroll> {
   @override
   void initState() {
     super.initState();
-    widget.controller.addListener(_onScroll);
+    widget.controller?.addListener(_onScroll);
+    widget.visible?.addListener(_onVisible);
     _enterTimer = Timer(widget.enterDelay, () {
       if (!mounted) return;
       setState(() {
@@ -90,21 +114,37 @@ class _HideOnScrollState extends State<HideOnScroll> {
   @override
   void didUpdateWidget(HideOnScroll old) {
     super.didUpdateWidget(old);
-    if (old.controller == widget.controller) return;
-    old.controller.removeListener(_onScroll);
-    widget.controller.addListener(_onScroll);
+    if (old.controller != widget.controller) {
+      old.controller?.removeListener(_onScroll);
+      widget.controller?.addListener(_onScroll);
+    }
+    if (old.visible != widget.visible) {
+      old.visible?.removeListener(_onVisible);
+      widget.visible?.addListener(_onVisible);
+    }
   }
 
   @override
   void dispose() {
     _enterTimer?.cancel();
-    widget.controller.removeListener(_onScroll);
+    widget.controller?.removeListener(_onScroll);
+    widget.visible?.removeListener(_onVisible);
     super.dispose();
   }
 
+  void _onVisible() {
+    final visible = widget.visible?.value ?? true;
+    if (!mounted || visible == _visible) return;
+    setState(() {
+      _visible = visible;
+      _entering = false;
+    });
+  }
+
   void _onScroll() {
-    if (!mounted || !widget.controller.hasClients) return;
-    final position = widget.controller.position;
+    final controller = widget.controller;
+    if (!mounted || controller == null || !controller.hasClients) return;
+    final position = controller.position;
 
     // The direction the user dragged, not the direction the offset moved: a
     // list settling after a fling, or being scrolled by anything other than a
