@@ -280,6 +280,15 @@ final class _MasonryParentData extends ContainerBoxParentData<RenderBox> {
   /// first. Measured fresh every layout, the card slid smoothly most of the
   /// way and then jumped the rest.
   Offset? expandFrom;
+
+  /// How tall it was then, which is what its column goes on being told it
+  /// costs.
+  ///
+  /// A card growing out of the grid is as wide as every column and belongs to
+  /// none of them, so its own column would otherwise close up — and every
+  /// card after it would shuffle forward, and back again when it returned,
+  /// for a movement that is not about them.
+  double? expandHeight;
 }
 
 final class _RenderMasonryFlow extends RenderBox
@@ -493,7 +502,10 @@ final class _RenderMasonryFlow extends RenderBox
 
       final col = _shortest(heights);
       final slot = Offset(col * (colWidth + _spacing), heights[col]);
-      if (!_isExpanded(at)) pd.expandFrom = null;
+      if (!_isExpanded(at)) {
+        pd.expandFrom = null;
+        pd.expandHeight = null;
+      }
       if (_isExpanded(at)) {
         // Between its column and the top of the grid, on [expansion] itself
         // rather than on the ease every other card travels by. The two are
@@ -504,8 +516,12 @@ final class _RenderMasonryFlow extends RenderBox
         //
         // It takes no column space either: it is as wide as all of them.
         pd.expandFrom ??= pd.current ?? slot;
+        pd.expandHeight ??= child.size.height;
         pd.target = Offset.lerp(pd.expandFrom!, Offset.zero, _expansion)!;
         pd.current = pd.target;
+        // Its column is told it is still the size it was, so the cards after
+        // it stay where they are.
+        heights[col] += _slotHeight(pd.expandHeight!);
       } else {
         pd.target = slot;
         heights[col] += _slotHeight(child.size.height);
