@@ -42,6 +42,7 @@ final class AnimatedMasonry extends StatefulWidget {
     this.footer,
     this.expandedKey,
     this.expansion = 0,
+    this.scrollable = true,
   });
 
   /// One per card. Each must carry a [Key] — see the class doc.
@@ -94,6 +95,14 @@ final class AnimatedMasonry extends StatefulWidget {
 
   /// {@macro masonry_expansion}
   final double expansion;
+
+  /// Whether this brings its own scrolling.
+  ///
+  /// Off for a grid that is one section of a longer page — several of these
+  /// under one scroll view, with a heading above each. Then [padding] is the
+  /// section's own inset and the page supplies the rest, and [controller] and
+  /// [header] belong to whatever is doing the scrolling instead.
+  final bool scrollable;
 
   @override
   State<AnimatedMasonry> createState() => _AnimatedMasonryState();
@@ -161,6 +170,17 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
       ],
     );
 
+    final body = widget.header == null && widget.footer == null
+        ? grid
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [?widget.header, grid, ?widget.footer],
+          );
+
+    if (!widget.scrollable) {
+      return Padding(padding: widget.padding, child: body);
+    }
+
     return SingleChildScrollView(
       controller: widget.controller,
       padding: widget.padding,
@@ -169,12 +189,7 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
       // under, and pull-to-refresh needs somewhere to pull from; a page of one
       // card had neither, and read as frozen rather than as short.
       physics: const AlwaysScrollableScrollPhysics(),
-      child: widget.header == null && widget.footer == null
-          ? grid
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [?widget.header, grid, ?widget.footer],
-            ),
+      child: body,
     );
   }
 }
