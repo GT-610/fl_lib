@@ -19,6 +19,8 @@ class PageColumns extends StatelessWidget {
     required this.children,
     this.controller,
     this.bottomInset = 0,
+    this.padding = defaultPadding,
+    this.spacing = defaultSpacing,
   });
 
   final List<Widget> children;
@@ -31,30 +33,54 @@ class PageColumns extends StatelessWidget {
   /// bottom of the page can only be read by scrolling past its own end.
   final double bottomInset;
 
+  /// Around the grid.
+  ///
+  /// Given rather than fixed because what a child *is* decides how much of
+  /// this it already carries: a `CardX` brings a margin of its own, so a page
+  /// of them wants less here than a page of bare rows to reach the same gap on
+  /// screen.
+  final EdgeInsets padding;
+
+  /// Between one column and the next, and between two children of one.
+  final double spacing;
+
   static const columnWidth = UIs.pageColumnWidth;
 
   static const _maxColumns = 3;
 
-  /// Wide enough for [_maxColumns] and no more. Derived from the grid's own
-  /// arithmetic rather than written out, so it follows if either input
-  /// changes — a cap without the width just leaves emptier columns.
-  static final maxWidth =
-      _maxColumns * columnWidth +
-      (_maxColumns - 1) * _spacing +
-      _padding.horizontal;
-
   // Both taken from the grid rather than restated. `_spacing` was written out
   // as its own 8 and would have gone on saying 8 after the grid stopped, which
   // is the disagreement the comment below is there to prevent.
-  static const _spacing = MasonryList.kSpacing;
-  static const _padding = MasonryList.kPadding;
+  static const defaultSpacing = MasonryList.kSpacing;
+  static const defaultPadding = MasonryList.kPadding;
+
+  /// Wide enough for [_maxColumns] and no more. Derived from the grid's own
+  /// arithmetic rather than written out, so it follows if either input
+  /// changes — a cap without the width just leaves emptier columns.
+  static final maxWidth = widthFor(_maxColumns);
+
+  /// How wide a grid of [columns] columns is, at its own metrics.
+  ///
+  /// What a caller capping the page it puts this on needs: a cap a few points
+  /// under this leaves [columnsFor] measuring room for one fewer, and the form
+  /// is laid out in a single column the width of two.
+  static double widthFor(
+    int columns, {
+    EdgeInsets padding = defaultPadding,
+    double spacing = defaultSpacing,
+  }) =>
+      columns * columnWidth + (columns - 1) * spacing + padding.horizontal;
 
   /// How many columns [width] holds. The same arithmetic [MasonryList] uses,
   /// so a page that switches between the two does not change width.
-  static int columnsFor(double width) {
-    final available = width - _padding.horizontal;
+  static int columnsFor(
+    double width, {
+    EdgeInsets padding = defaultPadding,
+    double spacing = defaultSpacing,
+  }) {
+    final available = width - padding.horizontal;
     if (available <= 0) return 1;
-    return ((available + _spacing) / (columnWidth + _spacing)).floor().clamp(
+    return ((available + spacing) / (columnWidth + spacing)).floor().clamp(
       1,
       _maxColumns,
     );
@@ -73,20 +99,26 @@ class PageColumns extends StatelessWidget {
     // body, and the grid it replaced needed one too.
     return Center(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
+        constraints: BoxConstraints(
+          maxWidth: widthFor(_maxColumns, padding: padding, spacing: spacing),
+        ),
         child: SizedBox.expand(
           child: LayoutBuilder(
             builder: (_, cons) {
-              final columns = columnsFor(cons.maxWidth);
+              final columns = columnsFor(
+                cons.maxWidth,
+                padding: padding,
+                spacing: spacing,
+              );
               return SingleChildScrollView(
                 controller: controller,
-                padding: _padding.copyWith(
-                  bottom: _padding.bottom + bottomInset,
+                padding: padding.copyWith(
+                  bottom: padding.bottom + bottomInset,
                 ),
                 child: columns == 1
                     ? Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        spacing: _spacing,
+                        spacing: spacing,
                         children: children,
                       )
                     : Row(
@@ -94,13 +126,13 @@ class PageColumns extends StatelessWidget {
                         // one beside a long one should stop rather than
                         // stretch.
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        spacing: _spacing,
+                        spacing: spacing,
                         children: [
                           for (var col = 0; col < columns; col++)
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                                spacing: _spacing,
+                                spacing: spacing,
                                 children: [
                                   for (
                                     var i = col;

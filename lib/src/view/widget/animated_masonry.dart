@@ -72,39 +72,18 @@ final class AnimatedMasonry extends StatefulWidget {
   State<AnimatedMasonry> createState() => _AnimatedMasonryState();
 }
 
-/// One card, for as long as it is on screen — which outlasts its removal from
-/// [AnimatedMasonry.children] by however long it takes to shrink away.
-final class _Entry {
-  _Entry({required this.key, required this.child, required this.anim});
-
-  final Key key;
-  Widget child;
-  final AnimationController anim;
-
-  /// Owned here rather than made in a `build`. A [CurvedAnimation] keeps a
-  /// listener on what it is driven by and has to be disposed; one per build
-  /// is a leak the framework reports by name.
-  late final CurvedAnimation curve = CurvedAnimation(
-    parent: anim,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeInCubic,
-  );
-
-  /// Whether this card is on its way out and is only still here to be seen
-  /// going.
-  bool leaving = false;
-
-  void dispose() {
-    curve.dispose();
-    anim.dispose();
-  }
-}
-
 final class _AnimatedMasonryState extends State<AnimatedMasonry>
     with TickerProviderStateMixin {
-  /// In the order they are laid out, which includes the ones on their way out
-  /// at the place they were last.
-  final _entries = <_Entry>[];
+  /// The cards on screen, which includes the ones on their way out at the
+  /// place they were last — see [AnimatedChildren], which is the same
+  /// bookkeeping [AnimatedColumn] does.
+  late final _children = AnimatedChildren(
+    vsync: this,
+    duration: widget.changeDuration,
+    onChanged: () {
+      if (mounted) setState(() {});
+    },
+  );
 
   @override
   void initState() {
@@ -112,91 +91,19 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
     // Already there, rather than every card growing in at once. The first
     // build is the grid arriving, and a card is only *new* against a grid that
     // was already on screen without it.
-    _sync(animateEntry: false);
+    _children.sync(widget.children, animateEntry: false);
   }
 
   @override
   void didUpdateWidget(AnimatedMasonry old) {
     super.didUpdateWidget(old);
-    _sync(animateEntry: true);
+    _children.sync(widget.children, animateEntry: true);
   }
 
   @override
   void dispose() {
-    for (final entry in _entries) {
-      entry.dispose();
-    }
-    _entries.clear();
+    _children.dispose();
     super.dispose();
-  }
-
-  /// Brings [_entries] in line with what was just built.
-  void _sync({required bool animateEntry}) {
-    final incoming = <Key, Widget>{};
-    for (final child in widget.children) {
-      final key = child.key;
-      assert(key != null, 'AnimatedMasonry children must carry a Key');
-      if (key != null) incoming[key] = child;
-    }
-
-    final byKey = {for (final entry in _entries) entry.key: entry};
-
-    // Gone from the build, so on its way out — unless it already was, in which
-    // case restarting would make it shrink from full size a second time.
-    for (final entry in _entries) {
-      if (incoming.containsKey(entry.key) || entry.leaving) continue;
-      entry.leaving = true;
-      entry.anim.reverse().whenComplete(() => _drop(entry));
-    }
-
-    // Back before it finished leaving. The card never went away, so it turns
-    // around from wherever it had shrunk to rather than starting over.
-    final ordered = <_Entry>[];
-    for (final MapEntry(key: key, value: child) in incoming.entries) {
-      final existing = byKey[key];
-      if (existing == null) {
-        final entry = _Entry(
-          key: key,
-          child: child,
-          anim: AnimationController(
-            vsync: this,
-            duration: widget.changeDuration,
-            value: animateEntry ? 0 : 1,
-          ),
-        );
-        if (animateEntry) entry.anim.forward();
-        ordered.add(entry);
-        continue;
-      }
-      existing.child = child;
-      if (existing.leaving) {
-        existing.leaving = false;
-        existing.anim.forward();
-      }
-      ordered.add(existing);
-    }
-
-    // The ones still shrinking, put back roughly where they were. Roughly is
-    // enough: whatever the layout makes of it, the move is animated.
-    for (var i = 0; i < _entries.length; i++) {
-      final entry = _entries[i];
-      if (!entry.leaving) continue;
-      ordered.insert(math.min(i, ordered.length), entry);
-    }
-
-    _entries
-      ..clear()
-      ..addAll(ordered);
-  }
-
-  void _drop(_Entry entry) {
-    // Already gone with the state, and disposed with it.
-    if (!mounted) return;
-    // It came back before the shrink finished, so this callback is stale and
-    // the card is on screen for a reason again.
-    if (!entry.leaving) return;
-    _entries.remove(entry);
-    setState(entry.dispose);
   }
 
   @override
@@ -216,7 +123,7 @@ final class _AnimatedMasonryState extends State<AnimatedMasonry>
         moveDuration: widget.moveDuration,
         vsync: this,
         children: [
-          for (final entry in _entries)
+          for (final entry in _children.entries)
             _MasonryEntry(
               // Derived from the card's key rather than being it. The wrapper
               // needs one — it is what keeps a card's element, and so its
