@@ -17,10 +17,18 @@ class ContextMenuAction {
     required this.text,
     required this.onTap,
     this.icon,
+    this.note,
     this.destructive = false,
   });
 
   final String text;
+
+  /// What the entry is of, when that is worth saying and is not the entry.
+  ///
+  /// An address to copy, a session to open. Drawn small and grey at the other
+  /// end of the row, so a menu can be read down its left edge and the detail
+  /// is there for the one entry being considered.
+  final String? note;
 
   /// Run after the menu has closed, so an action that opens a dialog of its
   /// own is not opening it underneath this one.
@@ -56,13 +64,23 @@ Future<void> showContextMenu(
   if (at == null) {
     chosen = await context.showRoundDialog<ContextMenuAction>(
       title: title,
-      child: Column(
+      // Scrolls, because how many entries there are is the caller's to decide
+      // and a dialog's height is the window's: a menu of everything that can
+      // be done to a server is a column taller than a laptop screen, and a
+      // `Column` past its box is an overflow rather than a scroll.
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (final action in actions)
             Btn.tile(
               icon: Icon(action.icon),
-              text: action.text,
+              // Joined rather than a column of its own: this is the branch
+              // with no room beside the text, and the note is part of what
+              // the entry is.
+              text: action.note == null
+                  ? action.text
+                  : '${action.text} · ${action.note}',
               textStyle: action.destructive
                   ? UIs.textRed
                   : const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
@@ -71,6 +89,7 @@ Future<void> showContextMenu(
               onTap: () => context.popDialog(action),
             ),
         ],
+        ),
       ),
     );
   } else {
@@ -114,6 +133,10 @@ Future<ContextMenuAction?> _showAt(
                 action.text,
                 style: action.destructive ? UIs.textRed : null,
               ),
+              if (action.note case final note?) ...[
+                const Spacer(),
+                Text(note, style: UIs.text11Grey),
+              ],
             ],
           ),
         ),
