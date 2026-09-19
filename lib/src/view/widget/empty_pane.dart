@@ -10,9 +10,16 @@ import 'package:flutter/material.dart';
 /// [label] and [action] are for where there is no rail — a page that is empty
 /// on its own, where nothing else on screen says what to do about it.
 class EmptyPane extends StatelessWidget {
-  const EmptyPane({super.key, required this.icon, this.label, this.action});
+  const EmptyPane({
+    super.key,
+    required this.icon,
+    this.title,
+    this.label,
+    this.action,
+  });
 
   final IconData icon;
+  final String? title;
   final String? label;
   final Widget? action;
 
@@ -27,7 +34,12 @@ class EmptyPane extends StatelessWidget {
     // already there.
     return ColoredBox(
       color: theme.scaffoldBackgroundColor,
-      child: EmptyMark(icon: icon, label: label, action: action),
+      child: EmptyMark(
+        icon: icon,
+        title: title,
+        label: label,
+        action: action,
+      ),
     );
   }
 }
@@ -38,12 +50,25 @@ class EmptyPane extends StatelessWidget {
 /// but it is the same nothing and says so the same way. Sharing the widget is
 /// what keeps the two from drifting apart in size or in how faint they are.
 class EmptyMark extends StatelessWidget {
-  const EmptyMark({super.key, required this.icon, this.label, this.action});
+  const EmptyMark({
+    super.key,
+    required this.icon,
+    this.title,
+    this.label,
+    this.action,
+  });
 
   final IconData icon;
 
-  /// What is empty, or what to do about it. Omitted where something else on
-  /// screen already says — see [EmptyPane].
+  /// What is empty, in as few words as it takes to name it.
+  ///
+  /// Omitted where something else on screen already says — see [EmptyPane].
+  /// A place with a title has a reason under it and a way out under that:
+  /// three lines is what an empty page owes the reader, and a page that
+  /// cannot fill all three usually should not have words at all.
+  final String? title;
+
+  /// Why it is empty, under [title]. The sentence, not the name.
   final String? label;
 
   /// One thing to do from here. Under the label, since it is what the label
@@ -53,6 +78,7 @@ class EmptyMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final title_ = title;
     final label_ = label;
     final action_ = action;
 
@@ -61,14 +87,33 @@ class EmptyMark extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 56, color: scheme.outlineVariant),
+          if (title_ != null) ...[
+            const SizedBox(height: 11),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 34),
+              child: Text(
+                title_,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.3,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
           if (label_ != null) ...[
-            const SizedBox(height: 13),
+            const SizedBox(height: 11),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 34),
               child: Text(
                 label_,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.outline),
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: scheme.outline,
+                ),
               ),
             ),
           ],

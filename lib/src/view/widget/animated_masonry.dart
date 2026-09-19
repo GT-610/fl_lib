@@ -205,7 +205,11 @@ final class _MasonryEntry extends StatelessWidget {
         // up from nothing would be the only thing on screen while it happened.
         child: ScaleTransition(
           scale: Tween(begin: 0.94, end: 1.0).animate(anim),
-          child: child,
+          // The width of the slot it was given, not of whatever is in it:
+          // [SizeTransition] is an `Align`, which loosens what it passes down,
+          // so a card would otherwise shrink-wrap — and a card that grows out
+          // of the grid would stop at the width of its old column.
+          child: SizedBox(width: double.infinity, child: child),
         ),
       ),
     );
