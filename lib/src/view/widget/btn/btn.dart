@@ -299,7 +299,21 @@ final class Btn extends StatelessWidget {
 
     Widget child = Tooltip(
       message: text,
-      child: icon ?? _kPlaceholderIcon,
+      // An `IconButton`'s colour, which is what this is. It took the ambient
+      // `IconTheme`'s instead, and `ThemeData`'s default for that is pure
+      // white on dark and near-black on light — brighter than any text beside
+      // it, which is `onSurface` at most. Every other control in the bars
+      // these sit in asks the scheme for this one, so a row of them was the
+      // loudest thing in a bar that is not about them.
+      //
+      // Merged rather than set: an icon given a colour of its own — a toggle
+      // drawn in the primary while it is on — keeps it.
+      child: IconTheme.merge(
+        data: IconThemeData(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        child: icon ?? _kPlaceholderIcon,
+      ),
     );
     if (padding != null) child = Padding(padding: padding!, child: child);
     return InkWell(
