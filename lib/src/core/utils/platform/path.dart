@@ -37,13 +37,19 @@ abstract final class Paths {
   /// Await [Paths.init] before using any of the paths
   ///
   /// - [dirs] are the working directories this app uses; see [PathDir].
+  /// - [fileInUserDocuments] keeps user-visible files in the platform's
+  ///   documents directory. Disable it when the app provides its own browser
+  ///   and needs a permission-free default location.
   static Future<void> init(
     String appName, {
     String? bakName,
     Set<PathDir> dirs = _allDirs,
+    bool fileInUserDocuments = true,
   }) async {
     doc = await _getDoc(appName);
-    file = await _getFile(appName);
+    file = fileInUserDocuments
+        ? await userFilesPath(appName)
+        : await _initDir('file');
     for (final dir in dirs) {
       final path = await _dirPath(dir, appName);
       switch (dir) {
@@ -247,16 +253,13 @@ abstract final class Paths {
 
   /// The user's own files: what was downloaded, and what they put there.
   ///
-  /// Resolved but deliberately not created when [_fileGoesToUserDocs]. macOS
-  /// gates `~/Documents` behind a permission prompt, and one raised while the
-  /// app is still starting has nothing to explain it. [ensureFile] makes the
-  /// directory at the point something is about to go in it.
-  static Future<String> _getFile(String appName) async {
-    if (_fileGoesToUserDocs) {
-      final docs = await getApplicationDocumentsDirectory();
-      return docs.path.joinPath(appName);
-    }
-    return _initDir('file');
+  /// Resolves the user-visible file directory without creating it. macOS gates
+  /// `~/Documents` behind a permission prompt, and resolving a possible legacy
+  /// source must not raise that prompt during startup.
+  static Future<String> userFilesPath(String appName) async {
+    if (!_fileGoesToUserDocs) return _initDir('file');
+    final docs = await getApplicationDocumentsDirectory();
+    return docs.path.joinPath(appName);
   }
 
   /// Creates [file] if it isn't there yet, and answers with it.
