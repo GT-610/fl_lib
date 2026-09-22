@@ -9,7 +9,13 @@ extension ThemeDataX on ThemeData {
         drawerTheme: const DrawerThemeData(backgroundColor: Colors.black),
         appBarTheme: const AppBarTheme(backgroundColor: Colors.black, scrolledUnderElevation: 0),
         dialogTheme: const DialogThemeData(backgroundColor: Colors.black),
-        bottomSheetTheme: const BottomSheetThemeData(backgroundColor: bgInDark),
+        // Opaque, where a card and a tile are not: those sit on the black
+        // scaffold, so [bgInDark] composites to black. A sheet sits over the
+        // page it was raised from, and at a quarter alpha that page read
+        // through it — through every sheet whose content is transparent and
+        // shows the sheet's colour.
+        bottomSheetTheme:
+            bottomSheetTheme.copyWith(backgroundColor: Colors.black),
         // Copied onto what the theme already carries, not replaced with. These
         // two slots are the ones an app configures for shape — a tile's
         // padding and height, a card's radius — and a fresh `…ThemeData`
