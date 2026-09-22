@@ -6,14 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
-/// Utility class for font-related operations.
 abstract final class FontUtils {
   /// Loads a font from a local file path.
   ///
-  /// - [localPath] is the path to the font file.
-  ///
-  /// The font name will be derived from the file name.
-  /// If the file doesn't exist or the name can't be extracted, the operation is silently skipped.
+  /// Derives the font name from the file name. Does nothing if the file or its
+  /// name is unavailable.
   static Future<void> loadFrom(String localPath) async {
     final name = localPath.getFileName();
     if (name == null) return;
@@ -25,12 +22,8 @@ abstract final class FontUtils {
   }
 }
 
-/// Utility class for system UI related operations.
 abstract final class SystemUIs {
-  /// Sets transparent navigation bar on Android devices.
-  ///
-  /// Only takes effect on Android platform. On other platforms, this method does nothing.
-  /// Uses edge-to-edge system UI mode with transparent navigation bar.
+  /// Enables edge-to-edge mode with a transparent navigation bar on Android.
   static void setTransparentNavigationBar(BuildContext context) {
     if (isAndroid) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

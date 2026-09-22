@@ -69,9 +69,7 @@ class _StoreSwitchState extends State<StoreSwitch> {
 }
 
 extension StoreBoolWidget on StorePropDefault<bool> {
-  /// Creates a [StoreSwitch] widget for this property.
-  ///
-  /// This is a convenience method to quickly create a switch widget bound to this property.
+  /// Creates a [StoreSwitch] bound to this property.
   StoreSwitch switchWidget({
     FutureOr<void> Function(bool)? callback,
     FutureOr<bool> Function(bool)? validator,

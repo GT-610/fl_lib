@@ -13,18 +13,14 @@ extension DialogX on BuildContext {
   static const _actionsPadding = EdgeInsets.only(left: 13, right: 13, bottom: 7);
   static const _contentPadding = EdgeInsets.all(24);
 
-  /// Show a dialog with a title, a child and actions.
+  /// Shows a dialog with a title, content, and actions.
   ///
   /// - [child] is the content of the dialog.
   /// - [actions] is the list of actions.
   /// - [title] is the title of the dialog.
-  /// - [barrierDismiss] if true, the dialog can be dismissed by tapping the barrier.
-  /// - [titleMaxLines] is the max lines of the title.
-  /// - [actionsPadding] is the padding of the actions.
-  /// - [contentPadding] is the padding of the content.
-  /// - [titleBuilder] is the function to build the title. If not null, [title] will be ignored.
-  /// - [childBuilder] is the function to build the child. If not null, [child] will be ignored.
-  /// - [actionsBuilder] is the function to build the actions. If not null, [actions] will be ignored.
+  /// - [barrierDismiss] allows tapping the barrier to dismiss the dialog.
+  /// - [titleBuilder], [childBuilder], and [actionsBuilder] override their
+  ///   corresponding values when provided.
   Future<T?> showRoundDialog<T>({
     Widget? child,
     List<Widget>? actions,

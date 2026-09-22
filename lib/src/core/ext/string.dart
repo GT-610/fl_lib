@@ -36,13 +36,13 @@ extension StringX on String {
 }
 
 extension StringColorX on String? {
-  /// Convert a hex string to a color.
+  /// Converts a hex string to a color.
   ///
   /// - The leading '#' is optional.
   /// - The alpha channel is optional.
-  /// - Except the '#', the length of the string should be 3(RGB), 4(ARGB), 6(RRGGBB), or 8(AARRGGBB).
+  /// - Excluding `#`, the length must be 3, 4, 6, or 8 hexadecimal digits.
   ///
-  /// eg.:
+  /// Examples:
   /// - '#FF0000' => Color(0xFFFF0000)
   /// - '#123' => Color(0xFF112233)
   /// - '11223344' => Color(0xFF11223344)
@@ -122,8 +122,7 @@ extension StringUrlX on String {
 }
 
 /// {@template string_path_separator}
-/// During the design period, the target platform only can be `android` or `ios`.
-/// So, the default [separator] is `/`.
+/// Uses `/` by default because this API targets Android and iOS paths.
 /// {@endtemplate}
 extension StringPathX on String {
   /// Join the path.

@@ -381,7 +381,7 @@ class _AdaptiveReorderableListState<T> extends State<AdaptiveReorderableList<T>>
           0.0,
           maxWidth - resolvedPadding.horizontal,
         );
-        // Allow embedding inside unconstrained parents (e.g. Column) without throwing.
+        // Unbounded parents such as Column require shrink wrapping.
         final shouldShrinkWrap = !constraints.hasBoundedHeight;
         final bool? primary =
             widget.primary ?? (shouldShrinkWrap ? false : null);

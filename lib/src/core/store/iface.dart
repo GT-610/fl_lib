@@ -16,10 +16,9 @@ part 'mock.dart';
 part 'sqlite.dart';
 
 /// {@template store_from_to}
-/// If there is a type which is not supported by the store, the store will call
-/// this function to convert the value between the type.
+/// Converts values whose types are not supported by the store.
 ///
-/// **DO NOT** use this if the raw value will effect the performance significantly, since it runs synchronously on the main thread.
+/// It runs synchronously on the main thread, so avoid expensive conversions.
 /// {@endtemplate}
 typedef StoreFromObj<T extends Object> = T? Function(Object? val);
 
@@ -28,12 +27,10 @@ typedef StoreToObj<T extends Object> = Object? Function(T? value);
 
 /// The interface of any [KvStore].
 ///
-/// The provider of the store can be `shared_preferences`, `hive`, `sqflite`, etc.
+/// A store may be backed by `shared_preferences`, Hive, or SQLite.
 ///
 /// {@template store_last_update_ts}
-/// The last update timestamp is used to check whether the data's has been updated.
-///
-/// It's designed that only one timestamp for all the data in one store.
+/// One timestamp tracks the latest update to any data in the store.
 /// {@endtemplate}
 sealed class KvStore {
   /// Serializes changes that read, replace, or restore [lastUpdateTs].
