@@ -168,10 +168,16 @@ final class SessionSwitcherLabel extends StatelessWidget {
     this.position,
     this.total = 0,
     this.icon,
+    this.leading,
     this.onTap,
   });
 
   final String name;
+
+  /// Drawn right before [name] — a state belonging to the session itself,
+  /// such as whether it is connected. Inside the label rather than beside it,
+  /// so it moves with the name and shares its ink.
+  final Widget? leading;
 
   /// Which one this is, counting from 1. Null shows [icon] instead — for a
   /// page that is not one of the set, such as the picker at its head.
@@ -189,6 +195,7 @@ final class SessionSwitcherLabel extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final position_ = position;
     final icon_ = icon;
+    final leading_ = leading;
 
     final label = Row(
       mainAxisSize: MainAxisSize.min,
@@ -201,6 +208,7 @@ final class SessionSwitcherLabel extends StatelessWidget {
         else if (total > 1)
           _SessionCounter(position: position_, total: total),
         const SizedBox(width: 7),
+        if (leading_ != null) ...[leading_, const SizedBox(width: 7)],
         Flexible(
           child: Text(
             name,
