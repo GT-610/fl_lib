@@ -84,75 +84,108 @@ class GuideView extends StatelessWidget {
       last: last,
     );
 
-    return LayoutBuilder(
-      builder: (_, cons) => Stack(
-        children: [
-          // Tapping the scrim moves on rather than dismissing. Dismissing is
-          // the ✕, which says so.
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: next,
-              child: spot == null
-                  ? ColoredBox(color: colour)
-                  : CustomPaint(
-                      painter: _HolePainter(
-                        spot: spot,
-                        radius: spotRadius,
-                        scrim: colour,
-                        edge: Theme.of(context).colorScheme.primary,
-                      ),
+    return Stack(
+      children: [
+        // Tapping the scrim moves on rather than dismissing. Dismissing is
+        // the ✕, which says so.
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: next,
+            child: spot == null
+                ? ColoredBox(color: colour)
+                : CustomPaint(
+                    painter: _HolePainter(
+                      spot: spot,
+                      radius: spotRadius,
+                      scrim: colour,
+                      edge: Theme.of(context).colorScheme.primary,
                     ),
-            ),
+                  ),
           ),
-          _place(card, spot, cons.biggest),
-        ],
-      ),
+        ),
+        _place(card, spot, MediaQuery.paddingOf(context)),
+      ],
     );
   }
 
-  /// Four sides rather than "above unless it is near the top": a rail is a
-  /// tall column against one edge and a bottom bar is a wide strip against
-  /// another, and the free space is on a different axis in each.
-  Widget _place(Widget card, Rect? spot, Size size) {
+  Widget _place(Widget card, Rect? spot, EdgeInsets safe) {
     if (spot == null) {
       return Positioned(left: 13, right: 13, bottom: 13, child: card);
     }
-
-    final child = Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: card,
-        ),
+    return Positioned.fill(
+      child: CustomSingleChildLayout(
+        delegate: _CardBesideSpot(spot: spot, safe: safe),
+        child: card,
       ),
     );
+  }
+}
 
-    final above = spot.top;
-    final below = size.height - spot.bottom;
-    final before = spot.left;
-    final after = size.width - spot.right;
+/// Puts the card in the margin around the spot that it actually fits in.
+///
+/// Four sides rather than "above unless it is near the top": a rail is a
+/// tall column against one edge and a bottom bar is a wide strip against
+/// another, and the free space is on a different axis in each.
+///
+/// Measured, not guessed from which margin is widest. A spot covering nearly
+/// the whole window — a remote desktop's canvas — leaves every margin thinner
+/// than the card, and the widest of them was a strip under the navigation bar
+/// the card overflowed out of. When none fits, the card goes over the spot at
+/// the bottom, where the spot-less guide puts it.
+final class _CardBesideSpot extends SingleChildLayoutDelegate {
+  const _CardBesideSpot({required this.spot, required this.safe});
 
-    if (math.max(above, below) >= math.max(before, after)) {
-      final onTop = above >= below;
-      return Positioned(
-        left: 0,
-        right: 0,
-        top: onTop ? 0 : spot.bottom,
-        height: onTop ? above : below,
-        child: child,
-      );
-    }
-    final onLeft = before >= after;
-    return Positioned(
-      top: 0,
-      bottom: 0,
-      left: onLeft ? 0 : spot.right,
-      width: onLeft ? before : after,
-      child: child,
+  final Rect spot;
+
+  /// System bars and cutouts, which the card stays clear of.
+  final EdgeInsets safe;
+
+  static const _gap = 20.0;
+  static const _maxWidth = 360.0;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final room = safe.deflateSize(constraints.biggest);
+    return BoxConstraints(
+      maxWidth: math.max(0, math.min(_maxWidth, room.width - 2 * _gap)),
+      maxHeight: math.max(0, room.height - 2 * _gap),
     );
   }
+
+  @override
+  Offset getPositionForChild(Size size, Size card) {
+    final area = safe.deflateRect(Offset.zero & size);
+    final sides = [
+      Rect.fromLTRB(area.left, area.top, area.right, spot.top),
+      Rect.fromLTRB(area.left, spot.bottom, area.right, area.bottom),
+      Rect.fromLTRB(area.left, area.top, spot.left, area.bottom),
+      Rect.fromLTRB(spot.right, area.top, area.right, area.bottom),
+    ];
+    Rect? best;
+    for (final side in sides) {
+      final fits =
+          side.width >= card.width + 2 * _gap &&
+          side.height >= card.height + 2 * _gap;
+      if (!fits) continue;
+      if (best == null ||
+          side.shortestSide * side.longestSide >
+              best.shortestSide * best.longestSide) {
+        best = side;
+      }
+    }
+    if (best != null) {
+      return best.center - Offset(card.width / 2, card.height / 2);
+    }
+    return Offset(
+      area.center.dx - card.width / 2,
+      area.bottom - 13 - card.height,
+    );
+  }
+
+  @override
+  bool shouldRelayout(_CardBesideSpot oldDelegate) =>
+      spot != oldDelegate.spot || safe != oldDelegate.safe;
 }
 
 /// [GuideView] over the whole window, driving its own step.
