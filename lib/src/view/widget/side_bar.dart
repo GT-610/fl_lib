@@ -421,7 +421,7 @@ class SideBarActions extends StatelessWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(minWidth: constraints.maxWidth),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
               for (var i = 0; i < actions.length; i++) ...[

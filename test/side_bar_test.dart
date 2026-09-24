@@ -146,7 +146,7 @@ void main() {
     expect(tester.getTopLeft(find.text('prod-1')).dy, greaterThan(without));
   });
 
-  testWidgets('actions center when they fit and scroll when they do not', (
+  testWidgets('actions align right when they fit and scroll when they do not', (
     tester,
   ) async {
     Widget page(double width, int count) => MaterialApp(
@@ -170,7 +170,7 @@ void main() {
     await tester.pumpWidget(page(320, 1));
     final rail = tester.getRect(find.byType(SideBarActions));
     final action = tester.getRect(find.byKey(const ValueKey('action-0')));
-    expect(action.center.dx, closeTo(rail.center.dx, 0.1));
+    expect(action.right, closeTo(rail.right, 0.1));
 
     await tester.pumpWidget(page(120, 4));
     final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
